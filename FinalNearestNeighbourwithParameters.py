@@ -1,0 +1,197 @@
+import time
+from scipy import linspace, polyval, polyfit, sqrt, stats, randn, optimize
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.linear_model import LogisticRegression
+import pandas as pd
+import os
+
+##=============================
+#Read the training file to 'df'
+#==============================
+if os.path.exists(r'D:\Data Analysis\Project1\Project1'):
+    df=pd.read_csv(r'D:\Data Analysis\Project1\Project1\titanic_train.csv',header=0)
+else:
+    print('Life sux')
+
+    
+##=============================
+#Print head and tail training file 
+#==============================
+
+print(df.shape)
+print("* df.head()", df.head(), sep="\n", end="\n\n")
+print("* df.tail()", df.tail(), sep="\n", end="\n\n")
+
+##=============================
+#Print head and tail training file 
+#==============================
+
+if os.path.exists(r'D:\Data Analysis\Project1\Project1'):
+    test=pd.read_csv(r'D:\Data Analysis\Project1\Project1\titanic_heldout.csv',header=0)
+else:
+    print('Cant read test file')
+
+    
+##=============================
+#Print head and tail testing file 
+#==============================
+
+print(test.shape)
+print("* test.head()", test.head(), sep="\n", end="\n\n")
+print("* test.tail()", test.tail(), sep="\n", end="\n\n")
+
+
+##=============================
+#Prelims: some important features 
+#==============================    
+    
+features=list(df.columns)
+
+print(df['survived'].value_counts())
+x=df['survived'].value_counts()
+total=x[0]+x[1]
+per_living=(x[1]/total)*100
+print("Percent of Living:",per_living)
+print("Percent of Dead:",100-per_living)
+
+##=============================
+#DATA PREPROCESSING 
+#==============================
+#Encode is a function to "MAP" the alphabetical values to a numeric one
+#We are going to use encode for name,sex,embarked
+#==============================
+def encode(column_name,new_name):
+    unique_vals=column_name.unique()
+    map_to_int={name:n for n,name in enumerate(unique_vals)}
+    new_name=column_name.replace(map_to_int)
+    return new_name
+#==============================
+#saving the orginal dataframe and copying to df1
+df1=df.copy()
+#==============================
+#plcass:-Good to go
+#==============================
+#survival:-result
+df1_results=df1.survived
+#==============================
+#name:-1st letter taken and "encoded" with the numerical value
+nam=df1.name
+i=0
+for x in df1.name:
+    i=i+1
+    nam[i]=x[1]
+
+df1.name=nam
+
+#encode the first letters in df1.name to a numerical value
+df1.name=encode(df1.name,nam)
+#==============================
+#sex has to be "ENCODED" from F and M to 0 and 1
+gender=df1.sex
+df1.sex=encode(df1.sex,gender)
+#==============================
+#age : there are some NaN values
+#in age which has to be filled with average values
+df1.age=df1.age.fillna(df1.age.mean())
+#==============================
+#checked if sibsp has any NaN values
+df1.sibsp.isna().any()
+#sibsp is good to go - no value is empty
+#==============================
+#checked if parch has any NaN values
+df1.parch.isna().any()
+#parch is good to go - no value is empty
+#==============================
+df1.fare.isna().any()
+#fare has NaN values:
+df1.fare=df1.fare.fillna(df1.fare.mean())
+#==============================
+#Embarked has to be "ENCODED"
+embark=df1.embarked
+df1.embarked=encode(df1.embarked,embark)
+#==============================
+df1.boat.isna().any()
+#boat has lot of empty values
+df1.boat.fillna(0)
+boat1=df1.boat
+df1.boat=encode(df1.boat,boat1)
+#==============================
+df1.body.isna().any()
+#boat has empty values
+df1.body.fillna(0)
+body1=df1.body
+df1.body=encode(df1.body,body1)
+#==============================
+
+#MANIPULATING TEST DATA
+
+#==============================
+#survived as result
+test_results=test.survived
+#encoding name
+print('There will be warning but dont worry and let the program run till it gives you accuracy')
+nam=test.name
+i=0
+for x in test.name:
+    i=i+1
+    nam[i]=x[1]
+
+test.name=nam
+test.name=encode(test.name,nam)
+#encoding sex
+gender=test.sex
+test.sex=encode(test.sex,gender)
+#age is filled with mean
+test.age=test.age.fillna(test.age.mean())
+#fare NaN is filled with avg
+test.fare=test.fare.fillna(test.fare.mean())
+#Embarked
+embark=test.embarked
+test.embarked=encode(test.embarked,embark)
+test.embarked=test.embarked.fillna(test.embarked.mode())
+#Boat fill values
+test.boat.fillna(0)
+boat1=test.boat
+test.boat=encode(test.boat,boat1)
+#Body
+test.body.fillna(0)
+body1=test.body
+test.body=encode(test.body,body1)
+#==============================
+#==============================
+
+cols=['pclass','sex','age','sibsp','parch','embarked','fare','boat','body']
+
+lup=0
+nneigh=[2,3,4,5]
+wgt=['uniform','distance']
+algo=['ball_tree','auto','kd_tree','brute']
+power=[1,2,3]
+best=0
+for n in nneigh:
+    for w in wgt:
+        for a in algo:
+            for p1 in power:
+                classi=KNeighborsClassifier(n_neighbors=n,weights=w,algorithm=a,p=p1)
+                classi.fit(df1[cols],df1.survived) # fitting the data in the model 
+                ypred=classi.predict(test[cols])# predicting the results in the model 
+                score=0;
+                for x in range(263):
+                    if(ypred[x]==test.survived[x]): # checking if the predicttions are correct
+                        score=score+1
+                        
+                print('Number of neighbors=',n,' and weight=',w,' algorithm=',a,' and Distance=',p1)
+                print('*Accuracy is:',(score/263)*100,'%')
+                accuracy=(score/263)*100;
+                if(best<accuracy):
+                    best=accuracy
+                    params=[n,w,p1]
+
+                    
+print('Best Acuracy=',best)                
+print('Best Params',params)
+
